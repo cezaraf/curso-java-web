@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: neovita-postgres
+    environment:
+      POSTGRES_DB: neovita
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5444:5432"
+    volumes:
+      - neovita_postgres_data:/var/lib/postgresql
+
+volumes:
+  neovita_postgres_data:

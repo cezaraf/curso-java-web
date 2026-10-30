@@ -1,0 +1,39 @@
+### LISTAGEM PAGINADA DE TIPOS DE EXAME
+GET http://localhost:8080/api/v1/tipo-exame?sort=nome,desc
+Accept: application/json
+
+### LISTAGEM PAGINADA DE TIPOS DE EXAME
+GET http://localhost:8080/api/v1/tipo-exame?page=0&size=10&sort=nome&sort=codigo,desc
+Accept: application/json
+
+### OBTENÇÃO DO TIPO DE EXAME PELO CÓDIGO
+GET http://localhost:8080/api/v1/tipo-exame/0002
+Accept: application/json
+
+### OBTENÇÃO DO TIPO DE EXAME PELO ID (UUID)
+GET http://localhost:8080/api/v1/tipo-exame/57c1d5c6-153d-45da-8ea4-323fa302af87
+Accept: application/json
+
+### CRIAÇÃO DE UM TIPO DE EXAME
+POST http://localhost:8080/api/v1/tipo-exame
+Content-Type: application/json
+Accept: application/json
+
+{
+  "codigo": "0001",
+  "nome": "Exame de Sangue"
+}
+
+### EDIÇÃO DE UM TIPO DE EXAME
+PATCH http://localhost:8080/api/v1/tipo-exame/6d443d14-a956-4224-9b06-1c51740e01a7
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Exame de Sangue - O+",
+  "descricao": "Exame feito apenas para pessoas com o sangue do tipo O+"
+}
+
+### REMOÇÃO DE UM TIPO DE EXAME
+DELETE http://localhost:8080/api/v1/tipo-exame/2da6bd07-8dd2-4ad2-8ca7-f3713ce8fb4b
+Accept: application/json
