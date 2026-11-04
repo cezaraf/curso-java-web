@@ -17,7 +17,6 @@ public class TipoExameEntity {
     private UUID id;
 
     @NotBlank
-    @Size(min = 4, max = 4)
     @Column(name = "cod_exame", nullable = false, unique = true, updatable = false, length = 4)
     private String codigo;
 

@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface TipoExameDeleteRepository extends Repository<TipoExameEntity, UUID> {
 
     void deleteById(UUID id);
+
+    boolean existsById(UUID id);
 }

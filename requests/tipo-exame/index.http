@@ -20,8 +20,8 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "codigo": "0001",
-  "nome": "Exame de Sangue"
+  "codigo": "00002",
+  "nome": "Exame de Urina"
 }
 
 ### EDIÇÃO DE UM TIPO DE EXAME
@@ -35,5 +35,5 @@ Accept: application/json
 }
 
 ### REMOÇÃO DE UM TIPO DE EXAME
-DELETE http://localhost:8080/api/v1/tipo-exame/2da6bd07-8dd2-4ad2-8ca7-f3713ce8fb4b
+DELETE http://localhost:8080/api/v1/tipo-exame/27a6d29a-8e3d-4ec5-9150-e5c0b9f01321
 Accept: application/json

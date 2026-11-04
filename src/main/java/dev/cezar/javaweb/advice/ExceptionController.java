@@ -1,10 +1,12 @@
 package dev.cezar.javaweb.advice;
 
-import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
+import dev.cezar.javaweb.exception.NeovitaConflictException;
 import dev.cezar.javaweb.exception.NeovitaValidationException;
+import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -16,6 +18,25 @@ public class ExceptionController {
         return ResponseEntity
                 .internalServerError()
                 .body(new DetalheErro(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(NeovitaConflictException.class)
+    public ResponseEntity<DetalheErro> handleNeovitaConflictException(NeovitaConflictException e) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new DetalheErro(HttpStatus.CONFLICT.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<DetalheErro> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        var fieldErros = e.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(DetalheErroCampo::new)
+                .toList();
+        return ResponseEntity
+                .status(HttpStatus.PRECONDITION_FAILED)
+                .body(new DetalheErro(HttpStatus.PRECONDITION_FAILED.value(), Mensagens.CONTEUDO_INVALIDO, fieldErros));
     }
 
     @ExceptionHandler(NeovitaValidationException.class)
