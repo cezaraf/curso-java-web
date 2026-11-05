@@ -30,7 +30,7 @@ Cada aula traz **o porquê**, **o código completo** a aplicar e **como verifica
 
 1. **Erro de validação devolve 500.** `@Valid` lança `MethodArgumentNotValidException`, que não tem handler e cai no `@ExceptionHandler(Exception.class)`.
 2. **JSON malformado devolve 500** (`HttpMessageNotReadableException`), e URL inexistente (ex.: `/favicon.ico`) também devolve 500 (`NoResourceFoundException`).
-3. **Descrição obrigatória no service, opcional no request.** O exemplo de POST do `requests/tipo-exame/index.http` (sem descrição) recebe 400.
+3. **Descrição obrigatória no service, opcional no request.** O exemplo de POST do `../requests/tipo-exame/delete.http` (sem descrição) recebe 400.
 4. **Código duplicado devolve 500.** O índice único gera `DataIntegrityViolationException`.
 5. **DELETE de id inexistente devolve 200** em silêncio.
 6. **POST devolve 200** em vez de `201 Created` com cabeçalho `Location`.
@@ -279,7 +279,7 @@ public class TipoExameDeleteController {
 
 ### Como verificar
 
-Pelo `requests/tipo-exame/index.http`:
+Pelo `../requests/tipo-exame/delete.http`:
 
 - POST sem descrição → `201` com cabeçalho `Location`.
 - POST repetindo o mesmo código → `409`.

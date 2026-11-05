@@ -1,0 +1,7 @@
+### OBTENÇÃO DO TIPO DE EXAME PELO CÓDIGO
+GET http://localhost:8080/api/v1/tipo-exame/0002
+Accept: application/json
+
+### OBTENÇÃO DO TIPO DE EXAME PELO ID (UUID)
+GET http://localhost:8080/api/v1/tipo-exame/57c1d5c6-153d-45da-8ea4-323fa302af87
+Accept: application/json

@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+import java.util.Random;
 
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -165,8 +166,10 @@ class TipoExameCreateControllerTest {
     @DisplayName("Deve retornar 409 quando código duplicado")
     void deveRetornar409QuandoCodigoDuplicado() throws Exception {
 
+        var codigo = new Random().nextInt(10000);
+
         var payload = Map.of(
-                "codigo", "0001",
+                "codigo", "%04d".formatted(codigo),
                 "nome", "Exame de Sangue"
         );
 
