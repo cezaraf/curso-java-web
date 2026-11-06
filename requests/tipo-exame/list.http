@@ -1,4 +1,8 @@
 ### LISTAGEM PAGINADA DE TIPOS DE EXAME
+GET http://localhost:8080/api/v1/tipo-exame
+Accept: application/json
+
+### LISTAGEM PAGINADA DE TIPOS DE EXAME
 GET http://localhost:8080/api/v1/tipo-exame?sort=nome,desc&nome=URINA&codigo=2
 Accept: application/json
 

@@ -4,6 +4,6 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "codigo": "00002",
-  "nome": "Exame de Urina"
+  "codigo": "0001",
+  "nome": "Exame de Sangue"
 }

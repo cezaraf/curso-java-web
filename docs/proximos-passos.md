@@ -171,9 +171,9 @@ public TipoExame editar(UUID id, TipoExameUpdateRequest request) throws TipoExam
 `src/main/java/dev/cezar/javaweb/tipoexame/create/TipoExameCreateController.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.create;
+package dev.cezar.javaweb.api.tipoexame.create;
 
-import dev.cezar.javaweb.tipoexame.TipoExame;
+import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -207,9 +207,9 @@ public class TipoExameCreateController {
 `src/main/java/dev/cezar/javaweb/tipoexame/delete/TipoExameDeleteRepository.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.delete;
+package dev.cezar.javaweb.api.tipoexame.delete;
 
-import dev.cezar.javaweb.tipoexame.TipoExameEntity;
+import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
 import org.springframework.data.repository.Repository;
 
 import java.util.UUID;
@@ -225,9 +225,9 @@ public interface TipoExameDeleteRepository extends Repository<TipoExameEntity, U
 `src/main/java/dev/cezar/javaweb/tipoexame/delete/TipoExameDeleteService.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.delete;
+package dev.cezar.javaweb.api.tipoexame.delete;
 
-import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
+import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -253,9 +253,9 @@ public class TipoExameDeleteService {
 `src/main/java/dev/cezar/javaweb/tipoexame/delete/TipoExameDeleteController.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.delete;
+package dev.cezar.javaweb.api.tipoexame.delete;
 
-import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
+import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -406,8 +406,9 @@ Sobe só a camada JPA (sem controllers), roda as migrations e faz rollback ao fi
 ```java
 package dev.cezar.javaweb.tipoexame;
 
-import dev.cezar.javaweb.tipoexame.create.TipoExameCreateRepository;
-import dev.cezar.javaweb.tipoexame.get.TipoExameGetRepository;
+import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
+import dev.cezar.javaweb.api.tipoexame.create.TipoExameCreateRepository;
+import dev.cezar.javaweb.api.tipoexame.get.TipoExameGetRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -450,10 +451,11 @@ class TipoExameGetRepositoryTest {
 ```java
 package dev.cezar.javaweb.tipoexame;
 
+import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
 import dev.cezar.javaweb.exception.NeovitaValidationException;
-import dev.cezar.javaweb.tipoexame.create.TipoExameCreateRepository;
-import dev.cezar.javaweb.tipoexame.create.TipoExameCreateRequest;
-import dev.cezar.javaweb.tipoexame.create.TipoExameCreateService;
+import dev.cezar.javaweb.api.tipoexame.create.TipoExameCreateRepository;
+import dev.cezar.javaweb.api.tipoexame.create.TipoExameCreateRequest;
+import dev.cezar.javaweb.api.tipoexame.create.TipoExameCreateService;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -507,9 +509,9 @@ class TipoExameCreateServiceTest {
 `src/main/java/dev/cezar/javaweb/tipoexame/list/TipoExameListRepository.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.list;
+package dev.cezar.javaweb.api.tipoexame.list;
 
-import dev.cezar.javaweb.tipoexame.TipoExameEntity;
+import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.Repository;
@@ -527,9 +529,9 @@ public interface TipoExameListRepository extends Repository<TipoExameEntity, UUI
 `src/main/java/dev/cezar/javaweb/tipoexame/list/TipoExameListService.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.list;
+package dev.cezar.javaweb.api.tipoexame.list;
 
-import dev.cezar.javaweb.tipoexame.TipoExame;
+import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -555,9 +557,9 @@ public class TipoExameListService {
 `src/main/java/dev/cezar/javaweb/tipoexame/list/TipoExameListController.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame.list;
+package dev.cezar.javaweb.api.tipoexame.list;
 
-import dev.cezar.javaweb.tipoexame.TipoExame;
+import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
@@ -674,7 +676,7 @@ create index tb_exame_id_paciente ON tb_exame (id_paciente);
 
 ### 4.2 Paciente
 
-`src/main/java/dev/cezar/javaweb/paciente/PacienteEntity.java`
+`../src/main/java/dev/cezar/javaweb/api/paciente`
 
 ```java
 package dev.cezar.javaweb.paciente;
@@ -705,10 +707,12 @@ public class PacienteEntity {
 }
 ```
 
-`src/main/java/dev/cezar/javaweb/paciente/Paciente.java`
+`../src/main/java/dev/cezar/javaweb/api/paciente`
 
 ```java
 package dev.cezar.javaweb.paciente;
+
+import dev.cezar.javaweb.api.paciente.PacienteEntity;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -720,7 +724,7 @@ public record Paciente(UUID id, String nome, String cpf, LocalDate dataNasciment
 }
 ```
 
-`src/main/java/dev/cezar/javaweb/paciente/PacienteNotFoundException.java`
+`../src/main/java/dev/cezar/javaweb/api/paciente`
 
 ```java
 package dev.cezar.javaweb.paciente;
@@ -770,7 +774,7 @@ public record PacienteCreateRequest(
 ```java
 package dev.cezar.javaweb.paciente.create;
 
-import dev.cezar.javaweb.paciente.PacienteEntity;
+import dev.cezar.javaweb.api.paciente.PacienteEntity;
 import org.springframework.data.repository.Repository;
 
 import java.util.UUID;
@@ -788,7 +792,7 @@ package dev.cezar.javaweb.paciente.create;
 
 import dev.cezar.javaweb.exception.NeovitaExceptionUtils;
 import dev.cezar.javaweb.paciente.Paciente;
-import dev.cezar.javaweb.paciente.PacienteEntity;
+import dev.cezar.javaweb.api.paciente.PacienteEntity;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -854,7 +858,7 @@ public class PacienteCreateController {
 ```java
 package dev.cezar.javaweb.paciente.get;
 
-import dev.cezar.javaweb.paciente.PacienteEntity;
+import dev.cezar.javaweb.api.paciente.PacienteEntity;
 import org.springframework.data.repository.Repository;
 
 import java.util.Optional;
@@ -935,8 +939,8 @@ public class PacienteGetController {
 ```java
 package dev.cezar.javaweb.exame;
 
-import dev.cezar.javaweb.paciente.PacienteEntity;
-import dev.cezar.javaweb.tipoexame.TipoExameEntity;
+import dev.cezar.javaweb.api.paciente.PacienteEntity;
+import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -1060,8 +1064,8 @@ import dev.cezar.javaweb.exception.NeovitaExceptionUtils;
 import dev.cezar.javaweb.exception.NeovitaNotFoundException;
 import dev.cezar.javaweb.paciente.PacienteNotFoundException;
 import dev.cezar.javaweb.paciente.get.PacienteGetRepository;
-import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
-import dev.cezar.javaweb.tipoexame.get.TipoExameGetRepository;
+import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
+import dev.cezar.javaweb.api.tipoexame.get.TipoExameGetRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

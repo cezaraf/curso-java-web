@@ -2,7 +2,7 @@ package dev.cezar.javaweb.advice;
 
 import dev.cezar.javaweb.exception.NeovitaConflictException;
 import dev.cezar.javaweb.exception.NeovitaValidationException;
-import dev.cezar.javaweb.tipoexame.TipoExameNotFoundException;
+import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
