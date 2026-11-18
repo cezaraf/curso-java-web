@@ -1,0 +1,11 @@
+### CADASTRAR UM PACIENTE
+POST http://localhost:8080/api/v1/paciente
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Maria Silva",
+  "cpf": "52998224725",
+  "dataNascimento": "1990-05-15",
+  "sexo": "FEMININO"
+}

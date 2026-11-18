@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = true)
 public class PacienteEntity extends NeovitaEntity {
 
-    enum Sexo {
+    public enum Sexo {
         MASCULINO, FEMININO
     }
 

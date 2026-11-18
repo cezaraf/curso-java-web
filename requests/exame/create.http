@@ -1,0 +1,10 @@
+### CADASTRAR UM EXAME
+POST http://localhost:8080/api/v1/exame
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Uréia",
+  "descricao": "Exame de uréia",
+  "tipoExame": "2fe3ca40-6c1f-41a2-95dc-b28b89a3d4c4"
+}

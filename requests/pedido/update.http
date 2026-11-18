@@ -1,0 +1,12 @@
+### ALTERANDO UM PEDIDO
+PATCH http://localhost:8080/api/v1/pedido/b2c3d4e5-f6a7-4890-b123-456789abcdef
+Content-Type: application/json
+Accept: application/json
+
+{
+  "dataPedido": "2026-11-18",
+  "paciente": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+  "exames": [
+    "e96a40c9-ebb2-449c-9095-2bf9dd58f764"
+  ]
+}

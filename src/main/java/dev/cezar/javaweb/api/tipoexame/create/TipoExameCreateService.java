@@ -32,7 +32,8 @@ public class TipoExameCreateService {
         try {
             return new TipoExame(this.repository.save(entity));
         } catch (DataIntegrityViolationException e) {
-            if (e.getCause() instanceof ConstraintViolationException cve && cve.getMessage().contains("tb_tipo_exame_cod_exame")) {
+            var detalhe = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+            if (detalhe.contains("tb_tipo_exame_cod_exame") || detalhe.contains("cod_exame")) {
                 throw new NeovitaConflictException(Mensagens.TIPO_EXAME_CREATE_CODIGO_DUPLICADO.formatted(request.codigo()), e);
             }
             throw e;

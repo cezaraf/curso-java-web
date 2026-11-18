@@ -1,0 +1,13 @@
+### CADASTRAR UM PEDIDO
+POST http://localhost:8080/api/v1/pedido
+Content-Type: application/json
+Accept: application/json
+
+{
+  "dataPedido": "2026-11-17",
+  "paciente": "662d2077-fe94-4dc4-8d0b-d156b7e79567",
+  "exames": [
+    "e96a40c9-ebb2-449c-9095-2bf9dd58f764",
+    "acea99cd-17e8-4672-af34-0e7e606fc360"
+  ]
+}

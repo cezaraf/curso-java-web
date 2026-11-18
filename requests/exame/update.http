@@ -1,0 +1,10 @@
+### ALTERANDO UM EXAMEM
+PATCH http://localhost:8080/api/v1/exame/fdfbb76b-e201-4d74-82f8-72f4e616b1d7
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nome": "Uréia",
+  "descricao": "Exame de uréia feito com a urina do paciente",
+  "tipoExame": "2fe3ca40-6c1f-41a2-95dc-b28b89a3d4c4"
+}

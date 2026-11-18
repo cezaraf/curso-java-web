@@ -1,0 +1,3 @@
+### OBTENÇÃO DE PEDIDO PELO ID (UUID)
+GET http://localhost:8080/api/v1/pedido/b2c3d4e5-f6a7-4890-b123-456789abcdef
+Accept: application/json

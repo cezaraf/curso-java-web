@@ -3,6 +3,7 @@ package dev.cezar.javaweb.api.base;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.util.UUID;
@@ -18,5 +19,6 @@ public class NeovitaEntity {
 
     @EqualsAndHashCode.Exclude
     @Column(name = "is_ativo", insertable = false, nullable = false)
-    private boolean ativo;
+    @ColumnDefault("true")
+    private boolean ativo = true;
 }

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -29,5 +30,5 @@ public class PedidoEntity extends NeovitaEntity {
             joinColumns = @JoinColumn(name = "pedido_id"),
             inverseJoinColumns = @JoinColumn(name = "exame_id")
     )
-    private List<ExameEntity> exames;
+    private List<ExameEntity> exames = new ArrayList<>();
 }

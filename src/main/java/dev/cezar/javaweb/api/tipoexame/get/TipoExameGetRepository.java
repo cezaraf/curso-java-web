@@ -21,4 +21,6 @@ public interface TipoExameGetRepository extends Repository<TipoExameEntity, UUID
                 order by t.nome
             """)
     Optional<TipoExame> findByCodigo(@Param("codigo") String codigo);
+
+    boolean existsById(UUID uuid);
 }

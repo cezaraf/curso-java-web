@@ -1,0 +1,3 @@
+### GET EXAME
+GET http://localhost:8080/api/v1/exame/e96a40c9-ebb2-449c-9095-2bf9dd58f764
+Accept: application/json

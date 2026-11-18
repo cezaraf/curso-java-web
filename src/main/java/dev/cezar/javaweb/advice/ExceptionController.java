@@ -1,8 +1,9 @@
 package dev.cezar.javaweb.advice;
 
 import dev.cezar.javaweb.exception.NeovitaConflictException;
+import dev.cezar.javaweb.exception.NeovitaNotFoundException;
 import dev.cezar.javaweb.exception.NeovitaValidationException;
-import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
+import lombok.extern.java.Log;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -10,11 +11,15 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.logging.Level;
+
+@Log
 @RestControllerAdvice
 public class ExceptionController {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<DetalheErro> handleException(Exception e) {
+        log.log(Level.SEVERE, e.getMessage(), e);
         return ResponseEntity
                 .internalServerError()
                 .body(new DetalheErro(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage()));
@@ -46,8 +51,8 @@ public class ExceptionController {
                 .body(new DetalheErro(HttpStatus.BAD_REQUEST.value(), e.getMessage()));
     }
 
-    @ExceptionHandler(TipoExameNotFoundException.class)
-    public ResponseEntity<DetalheErro> handleTipoExameNotFound(TipoExameNotFoundException e) {
+    @ExceptionHandler(NeovitaNotFoundException.class)
+    public ResponseEntity<DetalheErro> handleTipoExameNotFound(NeovitaNotFoundException e) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(new DetalheErro(HttpStatus.NOT_FOUND.value(), e.getMessage()));

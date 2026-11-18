@@ -1,11 +1,16 @@
 package dev.cezar.javaweb.api.tipoexame.list;
 
 import dev.cezar.javaweb.api.tipoexame.TipoExameEntity;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Map;
 
+import static dev.cezar.javaweb.api.base.SpecificationHelper.ilike;
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 class TipoExameSpecificationBuilder {
 
     static Specification<TipoExameEntity> build(Map<String, String> parametros) {
@@ -33,9 +38,5 @@ class TipoExameSpecificationBuilder {
             );
         }
         return Specification.unrestricted();
-    }
-
-    private static String ilike(String value) {
-        return "%" + value + "%";
     }
 }

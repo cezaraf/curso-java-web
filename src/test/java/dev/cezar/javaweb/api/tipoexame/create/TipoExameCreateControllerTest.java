@@ -1,6 +1,7 @@
 package dev.cezar.javaweb.api.tipoexame.create;
 
 import dev.cezar.javaweb.advice.Mensagens;
+import dev.cezar.javaweb.api.NeovitaMockMvcJson;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MediaType;
 import org.junit.jupiter.api.Test;
@@ -38,9 +39,10 @@ class TipoExameCreateControllerTest {
     @DisplayName("Deve cadastrar sem descrição e retornar 201")
     void deveCadastrarSemDescricaoERetornar201() throws Exception {
 
+        var codigo = "%04d".formatted(new Random().nextInt(10_000));
         var payload = Map.of(
-                "codigo", "0001",
-                "nome", "Exame de Sangue"
+                "codigo", codigo,
+                "nome", "Sangue " + codigo
         );
 
         var request = post(API_CREATE)
@@ -79,8 +81,9 @@ class TipoExameCreateControllerTest {
                 .andExpect(jsonPath("$.mensagem").value(Mensagens.CONTEUDO_INVALIDO))
                 .andExpect(jsonPath("$.erros").isArray())
                 .andExpect(jsonPath("$.erros").isNotEmpty())
-                .andExpect(jsonPath("$.erros[0].campo").value("nome"))
-                .andExpect(jsonPath("$.erros[0].mensagem").value(Mensagens.TIPO_EXAME_CREATE_NOME_NOT_EMPTY))
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErrosDoCampo("nome")).isNotEmpty())
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErroDoCampoComMensagem("nome", Mensagens.TIPO_EXAME_CREATE_NOME_NOT_EMPTY))
+                        .isNotEmpty())
         ;
     }
 
@@ -105,8 +108,9 @@ class TipoExameCreateControllerTest {
                 .andExpect(jsonPath("$.mensagem").value(Mensagens.CONTEUDO_INVALIDO))
                 .andExpect(jsonPath("$.erros").isArray())
                 .andExpect(jsonPath("$.erros").isNotEmpty())
-                .andExpect(jsonPath("$.erros[0].campo").value("nome"))
-                .andExpect(jsonPath("$.erros[0].mensagem").value(Mensagens.TIPO_EXAME_CREATE_NOME_SIZE))
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErrosDoCampo("nome")).isNotEmpty())
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErroDoCampoComMensagem("nome", Mensagens.TIPO_EXAME_CREATE_NOME_SIZE))
+                        .isNotEmpty())
         ;
     }
 
@@ -131,8 +135,9 @@ class TipoExameCreateControllerTest {
                 .andExpect(jsonPath("$.mensagem").value(Mensagens.CONTEUDO_INVALIDO))
                 .andExpect(jsonPath("$.erros").isArray())
                 .andExpect(jsonPath("$.erros").isNotEmpty())
-                .andExpect(jsonPath("$.erros[0].campo").value("nome"))
-                .andExpect(jsonPath("$.erros[0].mensagem").value(Mensagens.TIPO_EXAME_CREATE_NOME_SIZE))
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErrosDoCampo("nome")).isNotEmpty())
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErroDoCampoComMensagem("nome", Mensagens.TIPO_EXAME_CREATE_NOME_SIZE))
+                        .isNotEmpty())
         ;
     }
 
@@ -157,8 +162,9 @@ class TipoExameCreateControllerTest {
                 .andExpect(jsonPath("$.mensagem").value(Mensagens.CONTEUDO_INVALIDO))
                 .andExpect(jsonPath("$.erros").isArray())
                 .andExpect(jsonPath("$.erros").isNotEmpty())
-                .andExpect(jsonPath("$.erros[0].campo").value("codigo"))
-                .andExpect(jsonPath("$.erros[0].mensagem").value(Mensagens.TIPO_EXAME_CREATE_CODIGO))
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErrosDoCampo("codigo")).isNotEmpty())
+                .andExpect(jsonPath(NeovitaMockMvcJson.jsonPathErroDoCampoComMensagem("codigo", Mensagens.TIPO_EXAME_CREATE_CODIGO))
+                        .isNotEmpty())
         ;
     }
 

@@ -1,0 +1,19 @@
+### LISTA DE PACIENTES SEM FILTRO
+GET http://localhost:8080/api/v1/paciente
+Accept: application/json
+
+### LISTA DE PACIENTES COM FILTRO DE NOME
+GET http://localhost:8080/api/v1/paciente?nome=maria
+Accept: application/json
+
+### LISTA DE PACIENTES COM FILTRO DE CPF
+GET http://localhost:8080/api/v1/paciente?cpf=52998224725
+Accept: application/json
+
+### LISTA DE PACIENTES COM FILTRO DE SEXO
+GET http://localhost:8080/api/v1/paciente?sexo=FEMININO
+Accept: application/json
+
+### LISTA DE PACIENTES COM PAGINAÇÃO E ORDENAÇÃO
+GET http://localhost:8080/api/v1/paciente?page=0&size=10&sort=nome,asc
+Accept: application/json
