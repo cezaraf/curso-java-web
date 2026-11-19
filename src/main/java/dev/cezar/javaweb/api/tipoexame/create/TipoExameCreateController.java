@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.tipoexame.create;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.exception.NeovitaConflictException;
 import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @AllArgsConstructor
 @RequestMapping("/api/v1/tipo-exame")
 @Tag(name = "Tipo de Exame", description = "Gestão de Tipos de Exame")
+@PreAuthorize(Permissoes.PODE_ESCREVER_TIPO_EXAME)
 public class TipoExameCreateController {
 
     private final TipoExameCreateService service;

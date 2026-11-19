@@ -8,7 +8,8 @@ Cada aula traz **o porquê**, **o código completo** a aplicar e **como verifica
 |---|---|
 | Aulas 1 + 2 | 8 passando |
 | Aulas 3, 4 e 5 | 13 passando |
-| Aulas 6 e 7 | 16 passando + `docker build` concluído |
+| Aula 6 (Keycloak) | 56 passando, aplicada no próprio projeto (após o commit `fa2e4ea`) e validada com tokens reais do Keycloak |
+| Aula 7 | `docker build` concluído (versão anterior, com HTTP Basic) |
 
 ## Sumário
 
@@ -19,7 +20,7 @@ Cada aula traz **o porquê**, **o código completo** a aplicar e **como verifica
 | 3 | Filtro na listagem e documentação | Query methods, `Page` via DTO, springdoc/Swagger |
 | 4 | Paciente e Exame | Relacionamentos `@ManyToOne`, LAZY, N+1, `join fetch`, FK |
 | 5 | Consumindo API externa | `RestClient`, ViaCEP, `@RestClientTest` |
-| 6 | Segurança | Spring Security, HTTP Basic, perfis de acesso |
+| 6 | Segurança | Spring Security, OAuth2/JWT, Keycloak, perfis e permissões |
 | 7 | Configuração e deploy | Variáveis de ambiente, Actuator, Docker multi-stage, Compose |
 
 ---
@@ -1302,7 +1303,7 @@ class ExameApiTest {
 ### CADASTRO DE PACIENTE
 POST http://localhost:8080/api/v1/paciente
 Content-Type: application/json
-Authorization: Basic admin admin
+Authorization: Bearer {{access_token}}
 
 {
   "nome": "Maria Silva",
@@ -1313,7 +1314,7 @@ Authorization: Basic admin admin
 ### CADASTRO DE EXAME (use os ids retornados)
 POST http://localhost:8080/api/v1/exame
 Content-Type: application/json
-Authorization: Basic admin admin
+Authorization: Bearer {{access_token}}
 
 {
   "pacienteId": "<id do paciente>",
@@ -1325,10 +1326,10 @@ Authorization: Basic admin admin
 ### EXAMES DO PACIENTE
 GET http://localhost:8080/api/v1/paciente/<id do paciente>/exame
 Accept: application/json
-Authorization: Basic usuario usuario
+Authorization: Bearer {{access_token}}
 ```
 
-(O cabeçalho `Authorization` só é necessário depois da Aula 6.)
+(O cabeçalho `Authorization` só é necessário depois da Aula 6; o token vem de `requests/auth/token.http`.)
 
 ---
 
@@ -1500,21 +1501,440 @@ class ViaCepClientTest {
 
 ---
 
-## Aula 6 — Segurança com Spring Security
+## Aula 6 — Segurança com Spring Security, OAuth2 e Keycloak
 
-Regras:
+Até aqui qualquer pessoa chama qualquer endpoint. Nesta aula a API passa a exigir um **token JWT** emitido pelo
+**Keycloak**, e cada endpoint exige uma **permissão** específica.
 
-- Público: `/`, Swagger, `/actuator/health`.
-- `GET /api/**`: perfis `USER` ou `ADMIN`.
-- Qualquer escrita (POST/PATCH/DELETE): só `ADMIN`.
-- Autenticação HTTP Basic, sem sessão (API stateless).
+### 6.0 Visão geral
 
-### 6.1 Dependências (`pom.xml`)
+Os papéis do OAuth2 / OpenID Connect no nosso projeto:
+
+| Papel OAuth2 | Quem é | O que faz |
+|---|---|---|
+| *Authorization Server* | Keycloak (`http://localhost:8180`) | autentica o usuário e emite o token |
+| *Client* | `neovita-web` (cliente público) | pede o token em nome do usuário |
+| *Resource Server* | a nossa API (`neovita-api`) | valida o token e decide se libera o recurso |
+
+```
+usuário ──(login: usuário + senha)──▶ Keycloak ──(access token JWT)──▶ usuário
+usuário ──(Authorization: Bearer <token>)──▶ API ──(valida assinatura, iss, aud, exp + permissão)──▶ 200 / 401 / 403
+```
+
+A API **nunca vê a senha**: só confere a assinatura do token com a chave pública do Keycloak (JWKS).
+
+**Permissões × perfis.** Separamos duas coisas:
+
+- **Permissões** (*client roles* do client `neovita-api`): o que a API verifica. Uma de leitura e uma de escrita
+  por recurso: `tipo-exame:ler`, `tipo-exame:escrever`, `exame:ler`, `exame:escrever`, `paciente:ler`,
+  `paciente:escrever`, `pedido:ler`, `pedido:escrever`.
+- **Perfis** (*realm roles* compostas): agrupam permissões e são atribuídos aos usuários.
+
+| Perfil | Permissões |
+|---|---|
+| `ADMIN` | todas |
+| `ATENDENTE` | `paciente:*`, `pedido:*`, `exame:ler`, `tipo-exame:ler` |
+| `CONSULTA` | todas as `:ler` |
+
+> **Ponto de aula:** a API só conhece permissões. Criar um perfil novo ou mudar o que um perfil pode fazer
+> acontece **no Keycloak, sem recompilar a API**.
+
+Regras da API:
+
+- Público: `/`, `/index.html`, `/error`, Swagger e `/actuator/health`.
+- Sem token (ou token inválido/expirado) → `401`.
+- Token válido sem a permissão do endpoint → `403`.
+- Leitura (GET) exige `<recurso>:ler`; escrita (POST/PATCH/DELETE) exige `<recurso>:escrever`.
+- API stateless: sem sessão e sem cookie.
+
+### 6.1 Keycloak no `docker-compose.yaml`
+
+O Keycloak usa **o mesmo Postgres e o mesmo banco `neovita`**, mas num **schema próprio** (`keycloak`), para
+não misturar as tabelas dele com as nossas (que ficam no `public`, gerenciadas pelo Flyway).
+
+`docker-compose.yaml`
+
+```yaml
+services:
+  postgres:
+    image: postgres:latest
+    container_name: neovita-postgres
+    environment:
+      POSTGRES_DB: neovita
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5444:5432"
+    volumes:
+      - neovita_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d neovita"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+
+  # Cria o schema do Keycloak no banco da aplicação. Roda a cada subida (idempotente),
+  # pois scripts de docker-entrypoint-initdb.d só rodam com o volume vazio.
+  keycloak-db-init:
+    image: postgres:latest
+    container_name: neovita-keycloak-db-init
+    environment:
+      PGPASSWORD: postgres
+    command: ["psql", "-h", "postgres", "-U", "postgres", "-d", "neovita", "-c", "CREATE SCHEMA IF NOT EXISTS keycloak"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 64m
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    container_name: neovita-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/neovita
+      KC_DB_SCHEMA: keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_HOSTNAME: http://localhost:8180
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    mem_limit: 1g
+
+volumes:
+  neovita_postgres_data:
+```
+
+> **Pontos de aula:**
+>
+> - **Por que o `keycloak-db-init`?** O Keycloak não cria o schema sozinho, e os scripts de
+>   `/docker-entrypoint-initdb.d` do Postgres só rodam quando o volume está **vazio** — o nosso já tem dados.
+>   Um container que roda `CREATE SCHEMA IF NOT EXISTS` a cada subida resolve nos dois casos.
+> - **`depends_on` com condição:** `service_healthy` espera o `healthcheck` do Postgres passar;
+>   `service_completed_successfully` espera o `keycloak-db-init` terminar com código 0.
+> - **`KC_HOSTNAME`** fixa a URL pública do Keycloak. Ela vira o campo `iss` (*issuer*) do token:
+>   `http://localhost:8180/realms/neovita`. A API vai exigir exatamente esse valor.
+> - **`start-dev`** é o modo de desenvolvimento (HTTP, sem cache de produção). Em produção: `start` com HTTPS.
+> - **`--import-realm`** importa os arquivos `.json` de `/opt/keycloak/data/import` (a pasta `keycloak/realm` do
+>   projeto) na subida.
+> - **`127.0.0.1:8180`** publica a porta só na máquina local. Sem o `127.0.0.1`, o Docker abre a porta para a rede
+>   inteira.
+> - **Versão fixa da imagem** (`26.8.2`), nunca `latest`: o Keycloak muda bastante entre versões.
+
+### 6.2 Realm `neovita` (versionado no projeto)
+
+*Realm* é um "espaço" isolado do Keycloak, com seus próprios usuários, clients e roles. Em vez de configurar tudo
+clicando no console, versionamos o realm num JSON que o Keycloak importa na subida.
+
+O que o realm contém:
+
+- **Client `neovita-api`** (`bearerOnly`): representa a API. Não faz login; só é dono das **permissões**
+  (*client roles*).
+- **Client `neovita-web`** (público, sem segredo): é quem pede tokens. `directAccessGrantsEnabled: true` permite o
+  *password grant* (usuário e senha direto no endpoint de token), útil para testar pelos arquivos `.http`.
+  O mapper `oidc-audience-mapper` coloca `neovita-api` no campo `aud` (audiência) do token.
+- **Perfis** `ADMIN`, `ATENDENTE` e `CONSULTA` (*realm roles* compostas, que incluem as permissões).
+- **Usuários de teste** (senha igual ao usuário): `admin`, `atendente`, `consulta`.
+
+Crie a pasta `keycloak/realm` na raiz do projeto e o arquivo abaixo.
+
+<details>
+<summary><code>keycloak/realm/neovita-realm.json</code> (clique para expandir)</summary>
+
+```json
+{
+  "realm": "neovita",
+  "enabled": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Acesso total",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "tipo-exame:ler",
+              "tipo-exame:escrever",
+              "exame:ler",
+              "exame:escrever",
+              "paciente:ler",
+              "paciente:escrever",
+              "pedido:ler",
+              "pedido:escrever"
+            ]
+          }
+        }
+      },
+      {
+        "name": "ATENDENTE",
+        "description": "Atendimento: pacientes e pedidos; consulta exames",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "paciente:ler",
+              "paciente:escrever",
+              "pedido:ler",
+              "pedido:escrever",
+              "exame:ler",
+              "tipo-exame:ler"
+            ]
+          }
+        }
+      },
+      {
+        "name": "CONSULTA",
+        "description": "Somente leitura",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "tipo-exame:ler",
+              "exame:ler",
+              "paciente:ler",
+              "pedido:ler"
+            ]
+          }
+        }
+      }
+    ],
+    "client": {
+      "neovita-api": [
+        {
+          "name": "tipo-exame:ler",
+          "description": "Consultar tipos de exame"
+        },
+        {
+          "name": "tipo-exame:escrever",
+          "description": "Cadastrar, alterar e excluir tipos de exame"
+        },
+        {
+          "name": "exame:ler",
+          "description": "Consultar exames"
+        },
+        {
+          "name": "exame:escrever",
+          "description": "Cadastrar, alterar e excluir exames"
+        },
+        {
+          "name": "paciente:ler",
+          "description": "Consultar pacientes"
+        },
+        {
+          "name": "paciente:escrever",
+          "description": "Cadastrar, alterar e excluir pacientes"
+        },
+        {
+          "name": "pedido:ler",
+          "description": "Consultar pedidos"
+        },
+        {
+          "name": "pedido:escrever",
+          "description": "Cadastrar, alterar e excluir pedidos"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "neovita-api",
+      "name": "Neovita API",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "neovita-web",
+      "name": "Neovita Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "audience-neovita-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "neovita-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@neovita.local",
+      "emailVerified": true,
+      "firstName": "Administrador",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "ADMIN"
+      ]
+    },
+    {
+      "username": "atendente",
+      "enabled": true,
+      "email": "atendente@neovita.local",
+      "emailVerified": true,
+      "firstName": "Atendente",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "atendente",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "ATENDENTE"
+      ]
+    },
+    {
+      "username": "consulta",
+      "enabled": true,
+      "email": "consulta@neovita.local",
+      "emailVerified": true,
+      "firstName": "Consulta",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "consulta",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "CONSULTA"
+      ]
+    }
+  ]
+}
+```
+
+</details>
+
+> **Pegadinhas do Keycloak (já tratadas no JSON):**
+>
+> - **Usuário com perfil incompleto não loga.** Desde a versão 24, o Keycloak exige `email`, `firstName` e
+>   `lastName`. Sem eles, o token falha com `Account is not fully set up`. Por isso cada usuário tem
+>   `emailVerified: true` e `temporary: false` na senha.
+> - **Não declare `clientScopes` no JSON.** Se declarar, você substitui os escopos padrão do Keycloak e o token
+>   perde `resource_access` (as permissões).
+> - **`--import-realm` ignora realm que já existe.** Depois da primeira subida, editar o JSON não muda nada. Para
+>   reimportar:
+>
+>   ```bash
+>   docker compose exec postgres psql -U postgres -d neovita -c "DROP SCHEMA keycloak CASCADE"
+>   docker compose up -d --force-recreate keycloak-db-init keycloak
+>   ```
+>
+>   (ou apague o realm `neovita` no console e reinicie o container `keycloak`).
+
+> **Exercício:** abra o console em `http://localhost:8180` (`admin` / `admin`), escolha o realm `neovita` e
+> encontre: as permissões em *Clients → neovita-api → Roles*; os perfis em *Realm roles* (aba *Associated roles*);
+> os usuários em *Users → Role mapping*. Crie um perfil novo, por exemplo `LABORATORIO`, com `exame:*` e
+> `tipo-exame:*`.
+
+### 6.3 Subindo e conferindo o token
+
+```bash
+docker compose up -d
+docker compose logs -f keycloak   # espere: "Realm 'neovita' imported" e "Listening on"
+```
+
+A primeira subida é lenta (cerca de 1 a 2 minutos): o Keycloak cria as tabelas dele. Confira o schema:
+
+```bash
+docker compose exec postgres psql -U postgres -d neovita -c "\dt keycloak.*"
+```
+
+Confira o issuer (precisa ser `http://localhost:8180/realms/neovita`):
+
+```bash
+curl http://localhost:8180/realms/neovita/.well-known/openid-configuration
+```
+
+Peça um token:
+
+```bash
+curl -X POST http://localhost:8180/realms/neovita/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=neovita-web -d username=atendente -d password=atendente
+```
+
+Copie o `access_token` e decodifique em [jwt.io](https://jwt.io) (é um token de teste). Os campos que importam:
+
+```json
+{
+  "iss": "http://localhost:8180/realms/neovita",
+  "aud": ["neovita-api", "account"],
+  "preferred_username": "atendente",
+  "realm_access": { "roles": ["default-roles-neovita", "offline_access", "uma_authorization", "ATENDENTE"] },
+  "resource_access": {
+    "neovita-api": {
+      "roles": ["exame:ler", "paciente:escrever", "paciente:ler", "pedido:escrever", "pedido:ler", "tipo-exame:ler"]
+    }
+  }
+}
+```
+
+> **Ponto de aula:** o perfil `ATENDENTE` virou permissões no token sem a API fazer nada: o Keycloak expande as
+> roles compostas na emissão.
+
+### 6.4 Dependências (`pom.xml`)
+
+No Spring Boot 4, o starter se chama `spring-boot-starter-security-oauth2-resource-server` (o nome antigo,
+`spring-boot-starter-oauth2-resource-server`, está obsoleto). Ele já traz o `spring-boot-starter-security`.
 
 ```xml
 <dependency>
     <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-security</artifactId>
+    <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 </dependency>
 <dependency>
     <groupId>org.springframework.boot</groupId>
@@ -1523,32 +1943,158 @@ Regras:
 </dependency>
 ```
 
-### 6.2 Configuração
+### 6.5 `application.properties`
+
+Acrescente ao final de `src/main/resources/application.properties`:
+
+```properties
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/neovita}
+neovita.security.client-id=neovita-api
+```
+
+- `issuer-uri`: a partir dela o Spring descobre a chave pública (JWKS) e valida o `iss` de cada token.
+- `neovita.security.client-id`: propriedade nossa, com o client cujas roles são as permissões e que deve estar no
+  `aud`.
+
+### 6.6 Constantes das permissões
+
+Para não espalhar strings pelos controllers:
+
+`src/main/java/dev/cezar/javaweb/config/Permissoes.java`
+
+```java
+package dev.cezar.javaweb.config;
+
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+/**
+ * Permissões (client roles do client {@code neovita-api} no Keycloak) e as expressões
+ * usadas no {@code @PreAuthorize} dos controllers.
+ */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class Permissoes {
+
+    public static final String TIPO_EXAME_LER = "tipo-exame:ler";
+    public static final String TIPO_EXAME_ESCREVER = "tipo-exame:escrever";
+    public static final String EXAME_LER = "exame:ler";
+    public static final String EXAME_ESCREVER = "exame:escrever";
+    public static final String PACIENTE_LER = "paciente:ler";
+    public static final String PACIENTE_ESCREVER = "paciente:escrever";
+    public static final String PEDIDO_LER = "pedido:ler";
+    public static final String PEDIDO_ESCREVER = "pedido:escrever";
+
+    public static final String PODE_LER_TIPO_EXAME = "hasAuthority('" + TIPO_EXAME_LER + "')";
+    public static final String PODE_ESCREVER_TIPO_EXAME = "hasAuthority('" + TIPO_EXAME_ESCREVER + "')";
+    public static final String PODE_LER_EXAME = "hasAuthority('" + EXAME_LER + "')";
+    public static final String PODE_ESCREVER_EXAME = "hasAuthority('" + EXAME_ESCREVER + "')";
+    public static final String PODE_LER_PACIENTE = "hasAuthority('" + PACIENTE_LER + "')";
+    public static final String PODE_ESCREVER_PACIENTE = "hasAuthority('" + PACIENTE_ESCREVER + "')";
+    public static final String PODE_LER_PEDIDO = "hasAuthority('" + PEDIDO_LER + "')";
+    public static final String PODE_ESCREVER_PEDIDO = "hasAuthority('" + PEDIDO_ESCREVER + "')";
+}
+```
+
+> As constantes `PODE_*` são concatenações de constantes, então o Java as trata como **constantes de compilação**,
+> e por isso podem ser usadas dentro de anotações.
+
+### 6.7 Convertendo as roles do Keycloak em authorities
+
+Por padrão, o Spring transforma o claim `scope` do token em authorities `SCOPE_...`. O Keycloak põe as roles em
+outros claims (`resource_access` e `realm_access`), então escrevemos o conversor:
+
+`src/main/java/dev/cezar/javaweb/config/KeycloakJwtAuthoritiesConverter.java`
+
+```java
+package dev.cezar.javaweb.config;
+
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Converte as roles do token do Keycloak em authorities do Spring Security:
+ * <ul>
+ *     <li>{@code resource_access.<clientId>.roles} (permissões) → authority literal, ex.: {@code exame:ler};</li>
+ *     <li>{@code realm_access.roles} (perfis) → {@code ROLE_<perfil>}, ex.: {@code ROLE_ADMIN}.</li>
+ * </ul>
+ */
+public class KeycloakJwtAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
+
+    private final String clientId;
+
+    public KeycloakJwtAuthoritiesConverter(String clientId) {
+        this.clientId = clientId;
+    }
+
+    @Override
+    public Collection<GrantedAuthority> convert(Jwt jwt) {
+        var authorities = new ArrayList<GrantedAuthority>();
+
+        Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
+        if (resourceAccess != null && resourceAccess.get(this.clientId) instanceof Map<?, ?> client) {
+            roles(client).forEach(role -> authorities.add(new SimpleGrantedAuthority(role)));
+        }
+
+        Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+        if (realmAccess != null) {
+            roles(realmAccess).forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
+        }
+
+        return authorities;
+    }
+
+    private static List<String> roles(Map<?, ?> claim) {
+        if (claim.get("roles") instanceof Collection<?> roles) {
+            return roles.stream().map(String::valueOf).toList();
+        }
+        return List.of();
+    }
+}
+```
+
+> **Ponto de aula:** `hasAuthority('exame:ler')` compara a string exata; `hasRole('ADMIN')` procura
+> `ROLE_ADMIN`. Por isso as permissões entram "puras" e os perfis entram com o prefixo `ROLE_`.
+
+### 6.8 Configuração de segurança
 
 `src/main/java/dev/cezar/javaweb/config/SecurityConfig.java`
 
 ```java
 package dev.cezar.javaweb.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.SupplierJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.Collection;
+
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -1556,114 +2102,393 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index.html", "/error").permitAll()
                         .requestMatchers("/actuator/health/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**")
                         .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
-                        .anyRequest().hasRole("ADMIN"))
-                .httpBasic(Customizer.withDefaults())
+                        // As permissões de cada endpoint ficam no @PreAuthorize dos controllers.
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();
     }
 
     @Bean
-    PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    JwtAuthenticationConverter jwtAuthenticationConverter(@Value("${neovita.security.client-id}") String clientId) {
+        var converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(new KeycloakJwtAuthoritiesConverter(clientId));
+        converter.setPrincipalClaimName("preferred_username");
+        return converter;
     }
 
-    // Usuários em memória apenas para fins didáticos. Em produção: usuários no banco (UserDetailsService + JPA).
+    /**
+     * Decoder com validação de issuer (padrão) e de audience: só aceita tokens emitidos para a API.
+     * Criado de forma lazy (via issuer) para não consultar o Keycloak no startup.
+     */
     @Bean
-    UserDetailsService userDetailsService(PasswordEncoder encoder) {
-        return new InMemoryUserDetailsManager(
-                User.withUsername("usuario").password(encoder.encode("usuario")).roles("USER").build(),
-                User.withUsername("admin").password(encoder.encode("admin")).roles("ADMIN").build());
+    JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
+                          @Value("${neovita.security.client-id}") String clientId) {
+        var audience = new JwtClaimValidator<Collection<String>>(JwtClaimNames.AUD,
+                aud -> aud != null && aud.contains(clientId));
+        return new SupplierJwtDecoder(() -> {
+            NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefaultWithIssuer(issuer), audience));
+            return decoder;
+        });
     }
 }
 ```
 
-> **Ponto de aula:** por que `/error` precisa ser público — sem isso, qualquer erro (ex.: um 400) vira 401, porque o Spring redireciona internamente para `/error`, que estaria protegido.
+> **Pontos de aula:**
 >
-> CSRF desligado é aceitável aqui porque a API é stateless com HTTP Basic (sem cookie de sessão). Numa aplicação com login por formulário/cookie, **não** desligue.
+> - **`/error` público:** sem isso, qualquer erro (ex.: um 400) vira 401, porque o Spring redireciona internamente
+>   para `/error`, que estaria protegido.
+> - **CSRF desligado** é aceitável porque a API é stateless e recebe o token no cabeçalho `Authorization` (sem
+>   cookie de sessão). Numa aplicação com login por formulário/cookie, **não** desligue.
+> - **Validação do token:** assinatura (chave do JWKS), expiração (`exp`), issuer (`iss`) e **audience** (`aud`).
+>   Sem checar o `aud`, um token emitido para outra aplicação do mesmo realm também seria aceito.
+> - **`SupplierJwtDecoder`** só busca a configuração no Keycloak no primeiro token, então a API sobe mesmo com o
+>   Keycloak fora do ar (e os testes rodam sem Keycloak).
+> - **`@EnableMethodSecurity`** liga o `@PreAuthorize`. As regras por URL só exigem estar autenticado; quem decide
+>   a permissão é cada controller.
 
-### 6.3 Testes de segurança
+### 6.9 Permissão em cada controller
 
-Com a segurança ligada, os testes de API passam a receber `401`. Simule um usuário logado nos testes com `@WithMockUser`.
+Como cada controller do projeto tem uma única operação, o `@PreAuthorize` vai **na classe**. Exemplo:
 
-Em `TipoExameApiTest` **e** `ExameApiTest`, adicione o import e a anotação na classe:
+`src/main/java/dev/cezar/javaweb/api/exame/get/ExameGetController.java`
 
 ```java
-import org.springframework.security.test.context.support.WithMockUser;
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
+// ...
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-@WithMockUser(roles = "ADMIN")
-class TipoExameApiTest {
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/exame")
+@Tag(name = "Exame", description = "Gestão de Exames")
+@PreAuthorize(Permissoes.PODE_LER_EXAME)
+public class ExameGetController {
 ```
 
-Acrescente ao `TipoExameApiTest` o teste de permissão (a anotação no método sobrescreve a da classe):
+Aplique o mesmo nos 20 controllers, seguindo a regra: pacotes `get` e `list` usam `PODE_LER_<RECURSO>`;
+pacotes `create`, `update` e `delete` usam `PODE_ESCREVER_<RECURSO>`.
+
+| Pacote | `get`, `list` | `create`, `update`, `delete` |
+|---|---|---|
+| `api/tipoexame` | `PODE_LER_TIPO_EXAME` | `PODE_ESCREVER_TIPO_EXAME` |
+| `api/exame` | `PODE_LER_EXAME` | `PODE_ESCREVER_EXAME` |
+| `api/paciente` | `PODE_LER_PACIENTE` | `PODE_ESCREVER_PACIENTE` |
+| `api/pedido` | `PODE_LER_PEDIDO` | `PODE_ESCREVER_PEDIDO` |
+
+### 6.10 Acesso negado: 403, não 500
+
+O `@PreAuthorize` lança `AccessDeniedException` **dentro do controller**, então ela cai no nosso
+`@RestControllerAdvice`, e o handler genérico `Exception.class` devolveria `500`. Precisamos de um handler próprio.
+
+Em `advice/Mensagens.java`:
 
 ```java
-    @Test
-    @WithMockUser(roles = "USER")
-    void usuarioComumNaoPodeCadastrar() throws Exception {
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(json("1005", "Ureia")))
-                .andExpect(status().isForbidden());
+    public static final String ACESSO_NEGADO = "Você não tem permissão para acessar este recurso";
+```
+
+Em `advice/ExceptionController.java` (import `org.springframework.security.access.AccessDeniedException`):
+
+```java
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<DetalheErro> handleAccessDeniedException(AccessDeniedException e) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new DetalheErro(HttpStatus.FORBIDDEN.value(), Mensagens.ACESSO_NEGADO));
     }
 ```
 
-Teste do acesso anônimo:
+> **Ponto de aula:** o `401` **não** passa pelo advice: ele é gerado no filtro de segurança, antes de chegar a
+> qualquer controller. Um handler para `AuthenticationException` no advice nunca seria chamado.
 
-`src/test/java/dev/cezar/javaweb/tipoexame/TipoExameSemLoginTest.java`
+### 6.11 Token no Swagger
+
+Para o botão **Authorize** aparecer no Swagger UI:
+
+`src/main/java/dev/cezar/javaweb/config/OpenApiConfig.java`
 
 ```java
-package dev.cezar.javaweb.tipoexame;
+package dev.cezar.javaweb.config;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Permite informar o token do Keycloak no Swagger UI (botão "Authorize").
+ */
+@Configuration
+@OpenAPIDefinition(security = @SecurityRequirement(name = OpenApiConfig.BEARER))
+@SecurityScheme(name = OpenApiConfig.BEARER, type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
+public class OpenApiConfig {
+
+    static final String BEARER = "bearer-jwt";
+}
+```
+
+### 6.12 Testes
+
+Rode `./mvnw test` agora: os testes existentes passam a falhar com `401`. Os testes **não sobem o Keycloak**:
+simulamos o usuário autenticado.
+
+**Testes existentes.** Crie uma anotação que simula um usuário com todas as permissões:
+
+`src/test/java/dev/cezar/javaweb/api/ComAcessoTotal.java`
+
+```java
+package dev.cezar.javaweb.api;
+
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.test.context.support.WithMockUser;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Simula um usuário autenticado com todas as permissões (perfil ADMIN do Keycloak).
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@WithMockUser(username = "admin", authorities = {
+        Permissoes.TIPO_EXAME_LER, Permissoes.TIPO_EXAME_ESCREVER,
+        Permissoes.EXAME_LER, Permissoes.EXAME_ESCREVER,
+        Permissoes.PACIENTE_LER, Permissoes.PACIENTE_ESCREVER,
+        Permissoes.PEDIDO_LER, Permissoes.PEDIDO_ESCREVER,
+        "ROLE_ADMIN"})
+public @interface ComAcessoTotal {
+}
+```
+
+Adicione `@ComAcessoTotal` (e o import `dev.cezar.javaweb.api.ComAcessoTotal`) em **todas** as classes
+`*ControllerTest` de `src/test/java/dev/cezar/javaweb/api/**`, logo abaixo de `@ActiveProfiles("teste")`:
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("teste")
+@ComAcessoTotal
+class ExameCreateControllerTest {
+```
+
+> Os `*TestSupport` (que cadastram dados auxiliares) usam o mesmo `MockMvc` do teste, então herdam o usuário
+> simulado e não precisam mudar.
+
+**Testes de segurança.** Aqui usamos `jwt()`, que simula um token JWT já validado com as authorities informadas:
+
+`src/test/java/dev/cezar/javaweb/config/SegurancaControllerTest.java`
+
+```java
+package dev.cezar.javaweb.config;
+
+import dev.cezar.javaweb.advice.Mensagens;
+import dev.cezar.javaweb.api.NeovitaMockMvcJson;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Map;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
-class TipoExameSemLoginTest {
+@ActiveProfiles("teste")
+class SegurancaControllerTest {
+
+    private static final String API_TIPO_EXAME = "/api/v1/tipo-exame";
+    private static final String API_PACIENTE = "/api/v1/paciente";
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void deveRetornar401SemCredenciais() throws Exception {
-        mockMvc.perform(get("/api/v1/tipo-exame"))
+    @DisplayName("Deve retornar 401 sem token")
+    void deveRetornar401SemToken() throws Exception {
+        this.mockMvc.perform(get(API_TIPO_EXAME))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void healthEhPublico() throws Exception {
-        mockMvc.perform(get("/actuator/health"))
+    @DisplayName("Deve retornar 200 no GET com a permissão de leitura")
+    void deveRetornar200ComPermissaoDeLeitura() throws Exception {
+        this.mockMvc.perform(get(API_TIPO_EXAME)
+                        .with(jwt().authorities(new SimpleGrantedAuthority(Permissoes.TIPO_EXAME_LER))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 403 no GET sem a permissão do recurso")
+    void deveRetornar403SemPermissaoDoRecurso() throws Exception {
+        this.mockMvc.perform(get(API_PACIENTE)
+                        .with(jwt().authorities(new SimpleGrantedAuthority(Permissoes.TIPO_EXAME_LER))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 403 no POST com permissão só de leitura (perfil CONSULTA)")
+    void deveRetornar403NoPostSomenteComLeitura() throws Exception {
+        var payload = Map.of("codigo", "1234", "nome", "Bioquímica");
+
+        this.mockMvc.perform(post(API_TIPO_EXAME)
+                        .with(jwt().authorities(new SimpleGrantedAuthority(Permissoes.TIPO_EXAME_LER)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(NeovitaMockMvcJson.json(payload)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.statusHttp").value(403))
+                .andExpect(jsonPath("$.mensagem").value(Mensagens.ACESSO_NEGADO));
+    }
+
+    @Test
+    @DisplayName("Health deve ser público")
+    void healthDeveSerPublico() throws Exception {
+        this.mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk());
     }
 }
 ```
 
-### 6.4 Arquivos `.http`
+**Teste unitário do conversor** (sem Spring):
 
-Adicione em cada requisição de `requests/**/index.http` (o cliente HTTP do IntelliJ aceita usuário e senha direto):
+`src/test/java/dev/cezar/javaweb/config/KeycloakJwtAuthoritiesConverterTest.java`
+
+```java
+package dev.cezar.javaweb.config;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class KeycloakJwtAuthoritiesConverterTest {
+
+    private final KeycloakJwtAuthoritiesConverter converter = new KeycloakJwtAuthoritiesConverter("neovita-api");
+
+    @Test
+    @DisplayName("Deve converter permissões do client e perfis do realm")
+    void deveConverterPermissoesEPerfis() {
+        var jwt = jwt(Map.of(
+                "resource_access", Map.of(
+                        "neovita-api", Map.of("roles", List.of("exame:ler", "pedido:escrever")),
+                        "account", Map.of("roles", List.of("manage-account"))),
+                "realm_access", Map.of("roles", List.of("ATENDENTE"))));
+
+        var authorities = this.converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+
+        assertThat(authorities).containsExactlyInAnyOrder("exame:ler", "pedido:escrever", "ROLE_ATENDENTE");
+    }
+
+    @Test
+    @DisplayName("Deve retornar vazio quando o token não tem roles")
+    void deveRetornarVazioSemRoles() {
+        assertThat(this.converter.convert(jwt(Map.of("preferred_username", "fulano")))).isEmpty();
+    }
+
+    private static Jwt jwt(Map<String, Object> claims) {
+        var builder = Jwt.withTokenValue("token").header("alg", "none").subject("123");
+        claims.forEach(builder::claim);
+        return builder.build();
+    }
+}
+```
+
+> **Ponto de aula:** repare que as roles do client `account` são ignoradas: só contam as do `neovita-api`.
+
+### 6.13 Arquivos `.http`
+
+Crie `requests/auth/token.http`. Cada requisição guarda o token na variável global `access_token` (cliente HTTP
+do IntelliJ):
 
 ```http
-Authorization: Basic admin admin
+### TOKEN — ADMIN (todas as permissões)
+# Execute uma das requisições abaixo antes das demais: o token fica em {{access_token}}.
+POST http://localhost:8180/realms/neovita/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=neovita-web&username=admin&password=admin
+
+> {% client.global.set("access_token", response.body.access_token); %}
+
+### TOKEN — ATENDENTE (pacientes e pedidos; leitura de exames e tipos de exame)
+POST http://localhost:8180/realms/neovita/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=neovita-web&username=atendente&password=atendente
+
+> {% client.global.set("access_token", response.body.access_token); %}
+
+### TOKEN — CONSULTA (somente leitura)
+POST http://localhost:8180/realms/neovita/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=neovita-web&username=consulta&password=consulta
+
+> {% client.global.set("access_token", response.body.access_token); %}
 ```
+
+Em **todas** as requisições dos demais arquivos de `requests/`, acrescente logo abaixo da linha do método:
+
+```http
+GET http://localhost:8080/api/v1/tipo-exame
+Authorization: Bearer {{access_token}}
+Accept: application/json
+```
+
+O token expira em 30 minutos (`accessTokenLifespan: 1800` no realm). Quando aparecer `401`, rode o `token.http`
+de novo.
 
 ### Como verificar
 
-- `GET /api/v1/tipo-exame` sem credenciais → `401`.
-- Com `usuario/usuario`: GET → `200`; POST → `403`.
-- Com `admin/admin`: tudo liberado.
+1. `./mvnw test`: todos os testes passando.
+2. `docker compose up -d` e, com o Keycloak no ar, suba a aplicação com o profile `desenvolvimento`.
+3. Pegue um token de cada usuário e confira:
 
-> **Próximo passo (opcional):** trocar HTTP Basic por JWT com `spring-boot-starter-oauth2-resource-server` e guardar usuários no banco.
+| Requisição | sem token | `consulta` | `atendente` | `admin` |
+|---|---|---|---|---|
+| `GET /api/v1/tipo-exame` | 401 | 200 | 200 | 200 |
+| `POST /api/v1/tipo-exame` | 401 | 403 | 403 | 201 |
+| `GET /api/v1/paciente` | 401 | 200 | 200 | 200 |
+| `POST /api/v1/paciente` | 401 | 403 | 201 | 201 |
+| `DELETE /api/v1/exame/{id}` | 401 | 403 | 403 | 204 |
+| `GET /actuator/health` | 200 | 200 | 200 | 200 |
+
+> **Atenção:** use corpos **válidos** nos POST. O `@Valid` do `@RequestBody` é avaliado na hora de montar os
+> argumentos, **antes** de o `@PreAuthorize` ser checado na chamada do método. Por isso um usuário sem permissão
+> que manda corpo inválido recebe `412`, não `403`. Se o requisito for "sem permissão nunca vê erro de
+> validação", a regra precisa ir para o `authorizeHttpRequests`, por URL e método HTTP, que roda no filtro, antes
+> do controller. Bom tema para discussão em aula.
+
+O corpo do 403 segue o padrão de erro da API:
+
+```json
+{"statusHttp":403,"mensagem":"Você não tem permissão para acessar este recurso"}
+```
+
+> **Para ir além:** login pelo navegador com *Authorization Code + PKCE* (o client `neovita-web` já aceita
+> `http://localhost:*` como redirect), *refresh token* e logout.
 
 ---
+
 
 ## Aula 7 — Configuração por ambiente, Actuator e Docker
 
@@ -1691,6 +2516,11 @@ spring.data.web.pageable.serialization-mode=via-dto
 
 management.endpoints.web.exposure.include=health,info
 management.endpoint.health.probes.enabled=true
+
+# Segurança (Aula 6)
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/neovita}
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${KEYCLOAK_JWK_SET_URI:}
+neovita.security.client-id=neovita-api
 ```
 
 O Actuator já estava no `pom.xml`; agora `/actuator/health` (com `/liveness` e `/readiness`) e `/actuator/info` ficam expostos.
@@ -1727,7 +2557,7 @@ target
 
 ### 7.3 Compose com a aplicação
 
-Fixamos a versão do Postgres (`latest` pode mudar de versão maior sem aviso e quebrar o volume) e adicionamos `healthcheck` para a aplicação só subir com o banco pronto.
+Fixamos a versão do Postgres (`latest` pode mudar de versão maior sem aviso e quebrar o volume), mantemos o Keycloak da Aula 6 e adicionamos a aplicação, que só sobe com o banco pronto (`healthcheck`) e o Keycloak iniciado.
 
 `docker-compose.yaml`
 
@@ -1747,8 +2577,45 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d neovita"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 10
+    mem_limit: 512m
+
+  keycloak-db-init:
+    image: postgres:18
+    container_name: neovita-keycloak-db-init
+    environment:
+      PGPASSWORD: postgres
+    command: ["psql", "-h", "postgres", "-U", "postgres", "-d", "neovita", "-c", "CREATE SCHEMA IF NOT EXISTS keycloak"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 64m
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    container_name: neovita-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/neovita
+      KC_DB_SCHEMA: keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_HOSTNAME: http://localhost:8180
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    mem_limit: 1g
 
   app:
     build: .
@@ -1756,17 +2623,57 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/neovita
       DB_USER: postgres
       DB_PASSWORD: postgres
       SHOW_SQL: "false"
+      # O "iss" do token continua sendo localhost:8180 (KC_HOSTNAME); as chaves vêm pela rede interna.
+      KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/neovita
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/neovita/protocol/openid-connect/certs
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    mem_limit: 768m
 
 volumes:
   neovita_postgres_data:
 ```
+
+### 7.4 API em container validando o token
+
+Dentro do container, `localhost` é o próprio container da API, então ela não alcança `http://localhost:8180`
+para buscar a configuração do Keycloak. Mas o token continua trazendo `"iss": "http://localhost:8180/realms/neovita"`,
+porque é a URL que o **usuário** usa para pedir o token.
+
+A solução é separar as duas coisas:
+
+- **issuer** (`KEYCLOAK_ISSUER_URI`): o valor que o `iss` do token precisa ter. Continua `localhost:8180`.
+- **JWKS** (`KEYCLOAK_JWK_SET_URI`): de onde a API baixa as chaves públicas. Pela rede interna do compose:
+  `http://keycloak:8080/...`.
+
+No `SecurityConfig`, o decoder passa a usar o JWKS quando ele for informado:
+
+```java
+    @Bean
+    JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
+                          @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwkSetUri,
+                          @Value("${neovita.security.client-id}") String clientId) {
+        var audience = new JwtClaimValidator<Collection<String>>(JwtClaimNames.AUD,
+                aud -> aud != null && aud.contains(clientId));
+        return new SupplierJwtDecoder(() -> {
+            NimbusJwtDecoder decoder = jwkSetUri.isBlank()
+                    ? JwtDecoders.fromIssuerLocation(issuer)
+                    : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                    JwtValidators.createDefaultWithIssuer(issuer), audience));
+            return decoder;
+        });
+    }
+```
+
+Rodando pela IDE, a variável fica vazia e tudo continua como na Aula 6.
 
 ### Como verificar
 
@@ -1779,7 +2686,9 @@ curl http://localhost:8080/actuator/health
 ```
 
 ```bash
-curl -u admin:admin http://localhost:8080/api/v1/tipo-exame
+TOKEN=$(curl -s -X POST http://localhost:8180/realms/neovita/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=neovita-web -d username=admin -d password=admin | jq -r .access_token)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/tipo-exame
 ```
 
 > Se o container `neovita-postgres` atual estiver rodando, pare-o antes (`docker compose down`). O volume é mantido.

@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.tipoexame.get;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @RequestMapping("/api/v1/tipo-exame")
 @Tag(name = "Tipo de Exame", description = "Gestão de Tipos de Exame")
+@PreAuthorize(Permissoes.PODE_LER_TIPO_EXAME)
 public class TipoExameGetController {
 
     private final TipoExameGetService service;

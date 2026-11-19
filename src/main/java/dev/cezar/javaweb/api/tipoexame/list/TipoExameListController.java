@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.tipoexame.list;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.tipoexame.TipoExame;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +21,7 @@ import java.util.Map;
 @AllArgsConstructor
 @RequestMapping("/api/v1/tipo-exame")
 @Tag(name = "Tipo de Exame", description = "Gestão de Tipos de Exame")
+@PreAuthorize(Permissoes.PODE_LER_TIPO_EXAME)
 public class TipoExameListController {
 
     private final TipoExameListService service;

@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.paciente.delete;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.paciente.PacienteTestSupport;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class PacienteDeleteControllerTest {
 
     private static final String API_DELETE = "/api/v1/paciente/{id}";

@@ -46,4 +46,6 @@ public class Mensagens {
     public static final String PEDIDO_CREATE_DATA_PEDIDO_NOT_NULL = "É necessário informar a data do pedido";
 
     public static final String PEDIDO_CREATE_EXAMES_NOT_EMPTY = "É necessário informar ao menos um exame para o pedido";
+
+    public static final String ACESSO_NEGADO = "Você não tem permissão para acessar este recurso";
 }

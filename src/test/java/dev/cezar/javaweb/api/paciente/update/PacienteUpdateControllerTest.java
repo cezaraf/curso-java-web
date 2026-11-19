@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.paciente.update;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.NeovitaMockMvcJson;
 import dev.cezar.javaweb.api.paciente.PacienteTestSupport;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class PacienteUpdateControllerTest {
 
     private static final String API_UPDATE = "/api/v1/paciente/{id}";

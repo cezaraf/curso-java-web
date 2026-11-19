@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.exame.create;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.exame.Exame;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/exame")
 @Tag(name = "Exame", description = "Gestão de Exames")
+@PreAuthorize(Permissoes.PODE_ESCREVER_EXAME)
 public class ExameCreateController {
 
     private final ExameCreateService service;

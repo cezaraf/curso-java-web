@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.tipoexame.delete;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class TipoExameDeleteControllerTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.tipoexame.create;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.NeovitaMockMvcJson;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class TipoExameCreateControllerTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

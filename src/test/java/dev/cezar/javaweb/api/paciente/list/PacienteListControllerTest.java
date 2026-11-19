@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.paciente.list;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.api.paciente.PacienteTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class PacienteListControllerTest {
 
     private static final String API_LIST = "/api/v1/paciente";

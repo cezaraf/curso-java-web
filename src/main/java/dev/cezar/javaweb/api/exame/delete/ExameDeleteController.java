@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.exame.delete;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.exame.ExameNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/exame")
 @Tag(name = "Exame", description = "Gestão de Exames")
+@PreAuthorize(Permissoes.PODE_ESCREVER_EXAME)
 public class ExameDeleteController {
 
     private final ExameDeleteService service;

@@ -1,5 +1,6 @@
 ### CRIAÇÃO DE UM TIPO DE EXAME
 POST http://localhost:8080/api/v1/tipo-exame
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 Accept: application/json
 

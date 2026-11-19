@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.pedido.delete;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.pedido.PedidoNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/pedido")
 @Tag(name = "Pedido", description = "Gestão de Pedidos")
+@PreAuthorize(Permissoes.PODE_ESCREVER_PEDIDO)
 public class PedidoDeleteController {
 
     private final PedidoDeleteService service;

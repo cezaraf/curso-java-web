@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.pedido.list;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.pedido.Pedido;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/pedido")
 @Tag(name = "Pedido", description = "Gestão de Pedidos")
+@PreAuthorize(Permissoes.PODE_LER_PEDIDO)
 public class PedidoListController {
 
     private final PedidoListService service;

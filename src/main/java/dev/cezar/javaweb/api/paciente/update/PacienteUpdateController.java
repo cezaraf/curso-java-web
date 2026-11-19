@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.paciente.update;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.paciente.Paciente;
 import dev.cezar.javaweb.api.paciente.PacienteNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +16,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/paciente")
 @Tag(name = "Paciente", description = "Gestão de Pacientes")
+@PreAuthorize(Permissoes.PODE_ESCREVER_PACIENTE)
 public class PacienteUpdateController {
 
     private final PacienteUpdateService service;

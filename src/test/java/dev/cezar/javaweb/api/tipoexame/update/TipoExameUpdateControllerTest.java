@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.tipoexame.update;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.NeovitaMockMvcJson;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class TipoExameUpdateControllerTest {
 
     private static final String API_CREATE = "/api/v1/tipo-exame";

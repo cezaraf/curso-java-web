@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.exame.get;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.exame.ExameTestSupport;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class ExameGetControllerTest {
 
     private static final String API_GET = "/api/v1/exame/{id}";

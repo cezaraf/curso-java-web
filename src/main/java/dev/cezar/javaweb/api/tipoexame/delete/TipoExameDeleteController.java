@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.tipoexame.delete;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.tipoexame.TipoExameNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @RequestMapping("/api/v1/tipo-exame")
 @Tag(name = "Tipo de Exame", description = "Gestão de Tipos de Exame")
+@PreAuthorize(Permissoes.PODE_ESCREVER_TIPO_EXAME)
 public class TipoExameDeleteController {
 
     private final TipoExameDeleteService service;

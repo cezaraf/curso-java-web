@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.exame.get;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.exame.Exame;
 import dev.cezar.javaweb.api.exame.ExameNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/exame")
 @Tag(name = "Exame", description = "Gestão de Exames")
+@PreAuthorize(Permissoes.PODE_LER_EXAME)
 public class ExameGetController {
 
     private final ExameGetService service;

@@ -1,5 +1,7 @@
 package dev.cezar.javaweb.api.pedido.update;
 
+import dev.cezar.javaweb.config.Permissoes;
+import org.springframework.security.access.prepost.PreAuthorize;
 import dev.cezar.javaweb.api.pedido.Pedido;
 import dev.cezar.javaweb.api.pedido.PedidoNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +16,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/pedido")
 @Tag(name = "Pedido", description = "Gestão de Pedidos")
+@PreAuthorize(Permissoes.PODE_ESCREVER_PEDIDO)
 public class PedidoUpdateController {
 
     private final PedidoUpdateService service;

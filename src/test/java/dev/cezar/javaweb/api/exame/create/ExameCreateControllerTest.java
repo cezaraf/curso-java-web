@@ -1,5 +1,6 @@
 package dev.cezar.javaweb.api.exame.create;
 
+import dev.cezar.javaweb.api.ComAcessoTotal;
 import dev.cezar.javaweb.advice.Mensagens;
 import dev.cezar.javaweb.api.NeovitaMockMvcJson;
 import dev.cezar.javaweb.api.exame.ExameTestSupport;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("teste")
+@ComAcessoTotal
 class ExameCreateControllerTest {
 
     private static final String API_CREATE = "/api/v1/exame";
