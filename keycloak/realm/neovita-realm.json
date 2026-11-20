@@ -1,0 +1,202 @@
+{
+  "realm": "neovita",
+  "enabled": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Acesso total",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "tipo-exame:ler",
+              "tipo-exame:escrever",
+              "exame:ler",
+              "exame:escrever",
+              "paciente:ler",
+              "paciente:escrever",
+              "pedido:ler",
+              "pedido:escrever"
+            ]
+          }
+        }
+      },
+      {
+        "name": "ATENDENTE",
+        "description": "Atendimento: pacientes e pedidos; consulta exames",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "paciente:ler",
+              "paciente:escrever",
+              "pedido:ler",
+              "pedido:escrever",
+              "exame:ler",
+              "tipo-exame:ler"
+            ]
+          }
+        }
+      },
+      {
+        "name": "CONSULTA",
+        "description": "Somente leitura",
+        "composite": true,
+        "composites": {
+          "client": {
+            "neovita-api": [
+              "tipo-exame:ler",
+              "exame:ler",
+              "paciente:ler",
+              "pedido:ler"
+            ]
+          }
+        }
+      }
+    ],
+    "client": {
+      "neovita-api": [
+        {
+          "name": "tipo-exame:ler",
+          "description": "Consultar tipos de exame"
+        },
+        {
+          "name": "tipo-exame:escrever",
+          "description": "Cadastrar, alterar e excluir tipos de exame"
+        },
+        {
+          "name": "exame:ler",
+          "description": "Consultar exames"
+        },
+        {
+          "name": "exame:escrever",
+          "description": "Cadastrar, alterar e excluir exames"
+        },
+        {
+          "name": "paciente:ler",
+          "description": "Consultar pacientes"
+        },
+        {
+          "name": "paciente:escrever",
+          "description": "Cadastrar, alterar e excluir pacientes"
+        },
+        {
+          "name": "pedido:ler",
+          "description": "Consultar pedidos"
+        },
+        {
+          "name": "pedido:escrever",
+          "description": "Cadastrar, alterar e excluir pedidos"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "neovita-api",
+      "name": "Neovita API",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "neovita-web",
+      "name": "Neovita Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "audience-neovita-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "neovita-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@neovita.local",
+      "emailVerified": true,
+      "firstName": "Administrador",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "ADMIN"
+      ]
+    },
+    {
+      "username": "atendente",
+      "enabled": true,
+      "email": "atendente@neovita.local",
+      "emailVerified": true,
+      "firstName": "Atendente",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "atendente",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "ATENDENTE"
+      ]
+    },
+    {
+      "username": "consulta",
+      "enabled": true,
+      "email": "consulta@neovita.local",
+      "emailVerified": true,
+      "firstName": "Consulta",
+      "lastName": "Neovita",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "consulta",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-neovita",
+        "CONSULTA"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 ### EDIÇÃO DE UM TIPO DE EXAME
 PATCH http://localhost:8080/api/v1/tipo-exame/6d443d14-a956-4224-9b06-1c51740e01a7
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 Accept: application/json
 

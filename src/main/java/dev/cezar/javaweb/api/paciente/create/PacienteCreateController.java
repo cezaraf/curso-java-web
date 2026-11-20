@@ -1,12 +1,14 @@
 package dev.cezar.javaweb.api.paciente.create;
 
 import dev.cezar.javaweb.api.paciente.Paciente;
+import dev.cezar.javaweb.config.Permissoes;
 import dev.cezar.javaweb.exception.NeovitaConflictException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/paciente")
+@PreAuthorize(Permissoes.PODE_ESCREVER_PACIENTE)
 @Tag(name = "Paciente", description = "Gestão de Pacientes")
 public class PacienteCreateController {
 

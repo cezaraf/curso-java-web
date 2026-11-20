@@ -1,19 +1,24 @@
 ### LISTA DE PEDIDOS SEM FILTRO
 GET http://localhost:8080/api/v1/pedido
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE PEDIDOS COM FILTRO DE PACIENTE (ID)
 GET http://localhost:8080/api/v1/pedido?pacienteId=a1b2c3d4-e5f6-4789-a012-3456789abcde
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE PEDIDOS COM FILTRO DE NOME DO PACIENTE
 GET http://localhost:8080/api/v1/pedido?pacienteNome=maria
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE PEDIDOS COM FILTRO DE DATA
 GET http://localhost:8080/api/v1/pedido?dataPedido=2026-11-17
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE PEDIDOS COM PAGINAÇÃO E ORDENAÇÃO
 GET http://localhost:8080/api/v1/pedido?page=0&size=10&sort=dataPedido,desc
+Authorization: Bearer {{access_token}}
 Accept: application/json

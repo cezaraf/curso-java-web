@@ -1,16 +1,19 @@
 ### LISTA DE EXAMES SEM FILTRO
 GET http://localhost:8080/api/v1/exame
-Authorization: token
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE EXAMES COM FILTRO DE NOME
 GET http://localhost:8080/api/v1/exame?nome=uréia
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE EXAMES COM FILTRO DE NOME DO TIPO DE EXAME
 GET http://localhost:8080/api/v1/exame?tipoExame=urina
+Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### LISTA DE EXAMES COM FILTRO DO ID DO TIPO DE EXAME
 GET http://localhost:8080/api/v1/exame?tipoExameId=5fb7fde4-f551-48ca-bf7a-36ad28b7dc12
+Authorization: Bearer {{access_token}}
 Accept: application/json
